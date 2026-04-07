@@ -1,0 +1,27 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env
+
+# Project specific data
+data/raw_audio/
+data/processed_features/
+data/live_input.wav
+data/tts_output.mp3
+
+# Machine Learning models (Weight files are large)
+data/models/*.h5
+data/models/*.pt
+data/models/*.json
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
