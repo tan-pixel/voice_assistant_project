@@ -18,6 +18,7 @@ class PipelineOrchestrator:
         self.dashboard_callback = None 
         self.game_update_callback = None
         self.is_running = False
+        self.state_callback = None
         
         # Initialize modules
         print("Initializing Core Modules...")
@@ -34,6 +35,11 @@ class PipelineOrchestrator:
         if self.ui_callback:
             self.ui_callback(message)
         print(message)
+
+    def set_state(self, new_state):
+        self.state = new_state
+        if self.state_callback:
+            self.state_callback(new_state)
 
     def run_full_pipeline(self):
         """Executes the 7 steps in order, respecting the current system state."""
@@ -56,9 +62,10 @@ class PipelineOrchestrator:
             # User Verification
             if self.state == "Locked":
                 self.log("Step 1: Running Verification...")
-                self.state = self.m1.process(audio_path)
+                result = self.m1.process(audio_path)
+                self.set_state("Sleep" if result != "Locked" else "Locked")
                 self.log(f"System State: {self.state}")
-                if self.state == "Locked": 
+                if self.state == "Locked":
                     self.log("Verification failed. Try again or Bypass.")
                     return
             else:
@@ -67,9 +74,10 @@ class PipelineOrchestrator:
             # Wake Word
             if self.state == "Sleep":
                 self.log("Step 2: Running Wake Word Detection...")
-                self.state = self.m2.process(audio_path)
+                result = self.m2.process(audio_path)
+                self.set_state("Awake" if result != "Sleep" else "Sleep")
                 self.log(f"System State: {self.state}")
-                if self.state == "Sleep": 
+                if self.state == "Sleep":
                     self.log("Wake word not detected. Try again or Bypass.")
                     return
             else:
@@ -113,7 +121,7 @@ class PipelineOrchestrator:
             
             # Reset state back to Sleep after a successful command execution
             # We can comment this out if we want the system to stay awake forever after unlocking (maybe adjust later)
-            self.state = "Sleep"
+            self.set_state("Sleep")
             self.log("System returning to Sleep mode.")
             self.log("*** Pipeline Complete ***\n")
         
@@ -126,13 +134,14 @@ class PipelineOrchestrator:
         """Updates the system state and the UI."""
         self.log(f"*** Bypassing Step {step_num} ***")
         if step_num == 1:
-            self.state = "Sleep"
+            self.set_state("Sleep")
             return "Sleep"
         elif step_num == 2:
-            self.state = "Awake"
+            self.set_state("Awake")
             return "Awake"
-            
+        
         return f"Bypassed {step_num}"
+    
 
 if __name__ == "__main__":
     orchestrator = PipelineOrchestrator()

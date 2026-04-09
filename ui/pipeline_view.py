@@ -39,18 +39,20 @@ class PipelineView:
             btn = tk.Button(frame, text="Bypass", command=lambda n=step_num: self.handle_bypass(n))
             btn.pack(side="right")
             self.buttons[step_num] = btn
+        
+        self.orchestrator.state_callback = self.update_state_label
 
     def handle_bypass(self, step_num):
         # Call the orchestrator logic
         result = self.orchestrator.bypass_step(step_num)
         
         # Update State Label if step 1 or 2 was bypassed
-        if step_num in [1, 2]:
-            self.state_label.config(text=f"State: {result}")
-            if result == "Awake":
-                self.state_label.config(fg="green")
-            else:
-                self.state_label.config(fg="orange")
+        # if step_num in [1, 2]:
+        #     self.state_label.config(text=f"State: {result}")
+        #     if result == "Awake":
+        #         self.state_label.config(fg="green")
+        #     else:
+        #         self.state_label.config(fg="orange")
         
         # Log to the game view
         self.log_callback(f"Bypassed Step {step_num}: {result}")
@@ -59,3 +61,7 @@ class PipelineView:
         """Runs the pipeline in a separate thread to prevent freezing the GUI."""
         import threading
         threading.Thread(target=self.orchestrator.run_full_pipeline, daemon=True).start()
+
+    def update_state_label(self, new_state):
+        color = {"Locked": "red", "Sleep": "orange", "Awake": "green"}.get(new_state, "black")
+        self.state_label.config(text=f"State: {new_state}", fg=color)
