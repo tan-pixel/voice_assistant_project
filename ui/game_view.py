@@ -77,13 +77,19 @@ class GameView:
 
     def update_game_visuals(self, state):
         """Redraws the map and updates the stats panel based on live game state."""
+        if not isinstance(state, dict):
+            return # Failsafe if state is completely broken
+        
         # Update Stats Panel
-        self.hp_label.config(text=f"HP: {state['hp']}/{state['max_hp']}")
-        self.weapon_label.config(text=f"Weapon: {state['weapon']}")
-        self.pos_label.config(text=f"Position: {state['position']}")
+        hp = state.get('hp', '--')
+        max_hp = state.get('max_hp', '--')
+        self.hp_label.config(text=f"HP: {hp}/{max_hp}")
+        
+        self.weapon_label.config(text=f"Weapon: {state.get('weapon', 'None')}")
+        self.pos_label.config(text=f"Position: {state.get('position', ['-', '-'])}")
         
         self.inventory.delete(0, tk.END)
-        for i, item in enumerate(state['inventory'], 1):
+        for i, item in enumerate(state.get('inventory', []), 1):
             self.inventory.insert(tk.END, f"{i}. {item}")
 
         # Draw the Map (Grid System)
@@ -91,16 +97,21 @@ class GameView:
         cell_size = 50
         
         # Draw Map Items
-        for pos_str, item_name in state['map_items'].items():
-            y, x = map(int, pos_str.split(','))
-            cx, cy = x * cell_size + 25, y * cell_size + 25
-            
-            # Simple visual representation of items
-            icon = "🎁" if "Treasure" in item_name else "🧪" if "Potion" in item_name else "👹"
-            self.canvas.create_text(cx, cy, text=icon, font=("Arial", 20))
+        for pos_str, item_name in state.get('map_items', {}).items():
+            try:
+                y, x = map(int, pos_str.split(','))
+                cx, cy = x * cell_size + 25, y * cell_size + 25
+
+                # Simple visual representation of items
+                icon = "🎁" if "Treasure" in item_name else "🧪" if "Potion" in item_name else "👹"
+                self.canvas.create_text(cx, cy, text=icon, font=("Arial", 20))
+            except ValueError:
+                pass # Skip if coordinate format is weird
             
         # Draw Player
-        py, px = state['position']
-        cx, cy = px * cell_size + 25, py * cell_size + 25
-        self.canvas.create_oval(cx - 20, cy - 20, cx + 20, cy + 20, fill="lightblue", outline="blue", width=2)
-        self.canvas.create_text(cx, cy, text="🧍", font=("Arial", 16))
+        pos = state.get('position', [0, 0])
+        if isinstance(pos, list) and len(pos) == 2:
+            py, px = pos
+            cx, cy = px * cell_size + 25, py * cell_size + 25
+            self.canvas.create_oval(cx - 20, cy - 20, cx + 20, cy + 20, fill="lightblue", outline="blue", width=2)
+            self.canvas.create_text(cx, cy, text="🧍", font=("Arial", 16))
