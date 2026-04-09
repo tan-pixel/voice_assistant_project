@@ -4,7 +4,7 @@ from utils.audio_utils import extract_mfcc_for_inference
 
 class WakeWordDetectionModule:
     def __init__(self):
-        self.model_path = "data/models/wakeword_model.h5"
+        self.model_path = "data/models/wakeword_model.keras"
         
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Wake word model not found at '{self.model_path}'. Please run the training script.")

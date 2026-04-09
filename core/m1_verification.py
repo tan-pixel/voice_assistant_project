@@ -4,7 +4,7 @@ from utils.audio_utils import extract_mfcc_for_inference
 
 class UserVerificationModule:
     def __init__(self):
-        self.model_path = "data/models/verification_model.h5"
+        self.model_path = "data/models/verification_model.keras"
         
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Verification model not found at '{self.model_path}'. Please run the training script.")
