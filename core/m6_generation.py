@@ -32,7 +32,14 @@ class AnswerGenerationModule:
             return f"I have set a {data.get('name')} for {data.get('duration')}."
             
         elif source == "system":
-            return data.get("message", "I didn't quite catch that.")
+            if intent == "Greetings":
+                return "Hello! I am Atlas. What can I do for you today?"
+            elif intent == "Goodbye":
+                return "Goodbye! Have a great adventure."
+            elif intent == "OOS":
+                return "I'm sorry, I don't know how to do that yet."
+            else:
+                return data.get("message", "I didn't quite catch that.")
             
         return "I have no response for that."
 

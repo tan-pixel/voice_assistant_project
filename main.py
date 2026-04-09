@@ -17,6 +17,8 @@ class PipelineOrchestrator:
         self.ui_callback = None 
         self.dashboard_callback = None 
         self.game_update_callback = None
+        self.is_running = False
+        self.state_callback = None
         
         # Initialize modules
         print("Initializing Core Modules...")
@@ -34,91 +36,112 @@ class PipelineOrchestrator:
             self.ui_callback(message)
         print(message)
 
+    def set_state(self, new_state):
+        self.state = new_state
+        if self.state_callback:
+            self.state_callback(new_state)
+
     def run_full_pipeline(self):
         """Executes the 7 steps in order, respecting the current system state."""
-        audio_path = "data/live_input.wav"
+
+        if self.is_running:
+            self.log("Pipeline is busy. Please wait.")
+            return
+            
+        self.is_running = True # Lock the pipeline to prevent concurrent runs
         
-        self.log("\n*** Starting Pipeline ***")
+        try:
+            audio_path = "data/live_input.wav"
+            
+            self.log("\n*** Starting Pipeline ***")
+            
+            # Record Audio
+            self.log("Recording audio...")
+            record_audio(audio_path, duration=3.0)
+
+            # User Verification
+            if self.state == "Locked":
+                self.log("Step 1: Running Verification...")
+                result = self.m1.process(audio_path)
+                self.set_state("Sleep" if result != "Locked" else "Locked")
+                self.log(f"System State: {self.state}")
+                if self.state == "Locked":
+                    self.log("Verification failed. Try again or Bypass.")
+                    return
+            else:
+                self.log("Step 1: Bypassed (System is already Unlocked)")
+
+            # Wake Word
+            if self.state == "Sleep":
+                self.log("Step 2: Running Wake Word Detection...")
+                result = self.m2.process(audio_path)
+                self.set_state("Awake" if result != "Sleep" else "Sleep")
+                self.log(f"System State: {self.state}")
+                if self.state == "Sleep":
+                    self.log("Wake word not detected. Try again or Bypass.")
+                    return
+            else:
+                self.log("Step 2: Bypassed (System is already Awake)")
+
+            # ASR
+            self.log("Step 3: Running ASR (Whisper)...")
+            text = self.m3.process(audio_path)
+            self.log(f"Transcribed: '{text}'")
+            if not text: return
+
+            # Intent Detection
+            self.log("Step 4: Running Intent Detection...")
+            intent_data = self.m4.process(text)
+            self.log(f"Detected Intent: {intent_data}")
+
+            # Fulfillment
+            self.log("Step 5: Running Fulfillment...")
+            fulfillment_result = self.m5.process(intent_data)
+            source = fulfillment_result.get("source")
+            self.log(f"Fulfillment output: {source}")
+
+            # Answer Generation
+            self.log("Step 6: Generating Response...")
+            nl_response = self.m6.process(fulfillment_result)
+            self.log(f"Response: {nl_response}")
+
+            # Update the UI Dashboard if it's an API call
+            if source in ["weather_api", "timer", "dnd_api"]:
+                if self.dashboard_callback:
+                    self.dashboard_callback(source, nl_response)
+
+            elif source == "game_engine":
+                if self.game_update_callback:
+                    game_state = fulfillment_result.get("data", {}).get("state", {})
+                    self.game_update_callback(game_state)
+
+            # TTS
+            self.log("Step 7: Playing TTS...")
+            self.m7.process(nl_response)
+            
+            # Reset state back to Sleep after a successful command execution
+            # We can comment this out if we want the system to stay awake forever after unlocking (maybe adjust later)
+            self.set_state("Sleep")
+            self.log("System returning to Sleep mode.")
+            self.log("*** Pipeline Complete ***\n")
         
-        # Record Audio
-        self.log("Recording audio...")
-        record_audio(audio_path, duration=3.0)
-
-        # User Verification
-        if self.state == "Locked":
-            self.log("Step 1: Running Verification...")
-            self.state = self.m1.process(audio_path)
-            self.log(f"System State: {self.state}")
-            if self.state == "Locked": 
-                self.log("Verification failed. Try again or Bypass.")
-                return
-        else:
-            self.log("Step 1: Bypassed (System is already Unlocked)")
-
-        # Wake Word
-        if self.state == "Sleep":
-            self.log("Step 2: Running Wake Word Detection...")
-            self.state = self.m2.process(audio_path)
-            self.log(f"System State: {self.state}")
-            if self.state == "Sleep": 
-                self.log("Wake word not detected. Try again or Bypass.")
-                return
-        else:
-            self.log("Step 2: Bypassed (System is already Awake)")
-
-        # ASR
-        self.log("Step 3: Running ASR (Whisper)...")
-        text = self.m3.process(audio_path)
-        self.log(f"Transcribed: '{text}'")
-        if not text: return
-
-        # Intent Detection
-        self.log("Step 4: Running Intent Detection...")
-        intent_data = self.m4.process(text)
-        self.log(f"Detected Intent: {intent_data}")
-
-        # Fulfillment
-        self.log("Step 5: Running Fulfillment...")
-        fulfillment_result = self.m5.process(intent_data)
-        source = fulfillment_result.get("source")
-        self.log(f"Fulfillment output: {source}")
-
-        # Answer Generation
-        self.log("Step 6: Generating Response...")
-        nl_response = self.m6.process(fulfillment_result)
-        self.log(f"Response: {nl_response}")
-
-        # Update the UI Dashboard if it's an API call
-        if source in ["weather_api", "timer", "dnd_api"]:
-            if self.dashboard_callback:
-                self.dashboard_callback(source, nl_response)
-
-        elif source == "game_engine":
-            if self.game_update_callback:
-                game_state = fulfillment_result.get("data", {}).get("state", {})
-                self.game_update_callback(game_state)
-
-        # TTS
-        self.log("Step 7: Playing TTS...")
-        self.m7.process(nl_response)
-        
-        # Reset state back to Sleep after a successful command execution
-        # We can comment this out if we want the system to stay awake forever after unlocking (maybe adjust later)
-        self.state = "Sleep"
-        self.log("System returning to Sleep mode.")
-        self.log("*** Pipeline Complete ***\n")
+        except Exception as e:
+            self.log(f"An error occurred while running the pipeline: {e}")
+        finally:
+            self.is_running = False # Unlock the pipeline for the next run
 
     def bypass_step(self, step_num):
         """Updates the system state and the UI."""
         self.log(f"*** Bypassing Step {step_num} ***")
         if step_num == 1:
-            self.state = "Sleep"
+            self.set_state("Sleep")
             return "Sleep"
         elif step_num == 2:
-            self.state = "Awake"
+            self.set_state("Awake")
             return "Awake"
-            
+        
         return f"Bypassed {step_num}"
+    
 
 if __name__ == "__main__":
     orchestrator = PipelineOrchestrator()
