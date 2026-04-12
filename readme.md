@@ -60,6 +60,13 @@ python train_intent_model.py
 ```
 
 ## Usage
+
+For LLM responses, install and run ollama.
+After installation, pull ```qwen2.5:1.5b-instruct```:
+```
+ollama pull qwen2.5:1.5b-instruct
+```
+
 Run the main orchestrator to launch the GUI:
 ```
 python main.py
