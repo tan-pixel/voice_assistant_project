@@ -141,6 +141,107 @@ class PipelineOrchestrator:
             return "Awake"
         
         return f"Bypassed {step_num}"
+
+    def manual_override(self, step, data=None):
+        """Handles manual data injection and bypasses for all pipeline steps."""
+        if self.is_running:
+            self.log("Pipeline is busy. Please wait.")
+            return
+
+        self.is_running = True
+        try:
+            self.log(f"\n*** EXECUTING BYPASS FOR STEP {step} ***")
+            
+            if step == 1:
+                # Passcode Unlock Bypass
+                if data == "1234":  # Passcode
+                    self.set_state("Sleep")
+                    self.log("Success: System Unlocked via passcode bypass.")
+                else:
+                    self.log("Error: Incorrect passcode.")
+                    
+            elif step == 2:
+                # Wake Word Typing Bypass
+                if data.strip().lower() == "hey atlas":
+                    self.set_state("Awake")
+                    self.log("Success: System Awake via text bypass.")
+                else:
+                    self.log("Error: Incorrect wake word typed.")
+                    
+            elif step == 3:
+                # ASR Text Injection (Triggers M4 -> M7)
+                if not data: return
+                self.set_state("Awake")
+                self.log(f"Injected Transcript: '{data}'")
+                self.log("Step 4: Running Intent Detection...")
+                intent_data = self.m4.process(data)
+                self._resume_pipeline_from_step_5(intent_data)
+                
+            elif step == 4:
+                # Intent/Slot Injection (Triggers M5 -> M7)
+                if not data: return
+                self.set_state("Awake")
+                self.log(f"Injected Intent Data: {data}")
+                self._resume_pipeline_from_step_5(data)
+                
+            elif step == 5:
+                # Pre-Canned API Bypass (Triggers M6 -> M7)
+                self.set_state("Awake")
+                self.log("Injecting pre-canned API JSON...")
+                canned_fulfillment = {
+                    "source": "weather_api", 
+                    "data": {"city": "Cyberpunk City", "current": {"temperature_2m": 99}}, 
+                    "intent": "Weather"
+                }
+                self._resume_pipeline_from_step_6(canned_fulfillment)
+                
+            elif step == 6:
+                # Pre-Canned NL Bypass (Triggers M7)
+                self.set_state("Awake")
+                canned_nl = "This is a pre-canned emergency response bypassing the language model."
+                self.log(f"Response: {canned_nl}")
+                self.log("Step 7: Playing TTS...")
+                self.m7.process(canned_nl)
+                self.log("*** Pipeline Complete ***\n")
+
+        except Exception as e:
+            self.log(f"Bypass execution failed: {e}")
+        finally:
+            self.is_running = False
+
+    # *** HELPER METHODS TO AVOID DUPLICATING CODE ***
+
+    def _resume_pipeline_from_step_5(self, intent_data):
+        """Runs Fulfillment (M5) and flows into Step 6."""
+        self.log(f"Detected Intent: {intent_data}")
+        self.log("Step 5: Running Fulfillment...")
+        fulfillment_result = self.m5.process(intent_data)
+        self._resume_pipeline_from_step_6(fulfillment_result)
+
+    def _resume_pipeline_from_step_6(self, fulfillment_result):
+        """Runs Answer Gen (M6), UI updates, and TTS (M7)."""
+        source = fulfillment_result.get("source")
+        self.log(f"Fulfillment output: {source}")
+        
+        # Update UI Dashboards
+        if source in ["weather_api", "timer", "dnd_api"] and self.dashboard_callback:
+            self.dashboard_callback(source, "Processing...")
+        elif source == "game_engine" and self.game_update_callback:
+            game_state = fulfillment_result.get("data", {}).get("state", {})
+            self.game_update_callback(game_state)
+
+        # Generate Sentence
+        self.log("Step 6: Generating Response...")
+        nl_response = self.m6.process(fulfillment_result)
+        self.log(f"Response: {nl_response}")
+        
+        if source in ["weather_api", "timer", "dnd_api"] and self.dashboard_callback:
+            self.dashboard_callback(source, nl_response)
+
+        # Play TTS
+        self.log("Step 7: Playing TTS...")
+        self.m7.process(nl_response)
+        self.log("*** Pipeline Complete ***\n")
     
 
 if __name__ == "__main__":

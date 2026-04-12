@@ -1,6 +1,21 @@
 import random
+import ollama
 
 class AnswerGenerationModule:
+    
+    def __init__(self, use_llm=True, ollama_model="qwen2.5:1.5b-instruct"):
+        self.use_llm = use_llm
+        self.ollama_model = ollama_model
+        
+        if self.use_llm:
+            print(f"Connecting to Local LLM ({self.ollama_model}) via Ollama package...")
+            try:
+                # Ping the server by trying to list the downloaded models
+                ollama.list()
+            except Exception as e:
+                print(f"Notice: Ollama background server is not running ({e}). Falling back to Template Generation.")
+                self.use_llm = False
+    
     def process(self, fulfillment_data):
         """
         Input: Dictionary containing 'source', 'data', and 'intent' from M5.
@@ -18,6 +33,66 @@ class AnswerGenerationModule:
             print(f"Backend API Error: {data['error']}")
             return "I ran into a network issue and couldn't fetch that information right now."
 
+        # Ollama LLM route
+        if self.use_llm:
+            return self._generate_with_ollama(source, intent, data)
+        
+        # Template route
+        else:
+            return self._generate_with_templates(source, intent, data)
+
+    def _generate_with_ollama(self, source, intent, data):
+        """Creates a prompt from the JSON and asks Ollama to generate the response."""
+        
+        # Few-Shot Prompting
+        system_prompt = """You are Atlas, a conversational voice assistant. 
+        Your ONLY job is to convert the provided Intent and JSON Data into a single, natural, spoken English sentence.
+
+        CRITICAL RULES:
+        1. NEVER explain the JSON structure or say "This is a dictionary/JSON".
+        2. NEVER use markdown, asterisks, or bullet points.
+        3. Output EXACTLY ONE conversational sentence. Stop talking immediately after.
+
+        EXAMPLE 1:
+        Intent: Weather
+        Data: {'city': 'Paris', 'current': {'temperature_2m': 15, 'weather_code': 3}}
+        Output: The current temperature in Paris is 15 degrees.
+
+        EXAMPLE 2:
+        Intent: lookup_monster
+        Data: {'name': 'Ancient Red Dragon', 'armor_class': 22, 'hit_points': 546}
+        Output: An Ancient Red Dragon is a terrifying foe with an armor class of 22 and 546 hit points.
+        """
+
+        # User Prompt
+        user_prompt = f"Intent: {intent}\nData: {data}\nOutput:"
+        
+        try:
+            # We pass the system instructions separately from the user prompt for better obedience
+            response = ollama.generate(
+                model=self.ollama_model, 
+                system=system_prompt,
+                prompt=user_prompt
+            )
+            
+            # Extract the text 
+            result_text = response.get("response", "")
+            
+            # Clean up the response to ensure TTS reads it nicely
+            clean_text = result_text.strip().replace("*", "").replace("\n", " ")
+            
+            # # If the model still babbles, cut it off at the first period.
+            # if "." in clean_text:
+            #     clean_text = clean_text.split(".")[0] + "."
+                
+            return clean_text
+            
+        except Exception as e:
+            print(f"Ollama Generation Failed: {e}. Falling back to templates.")
+            return self._generate_with_templates(source, intent, data)
+        
+    def _generate_with_templates(self, source, intent, data):
+        """Hardcoded fallback templates."""
         # Route to the correct generation logic
         if source == "game_engine":
             return self._generate_game_response(data)
