@@ -49,24 +49,20 @@ class IntentDetectionModule:
             print("WARNING: Trained BERT model files not found. Using fallback heuristics.")
             return False
 
-        try:
-            with open(self.intent_map_path, 'r') as f:
-                self.intent2id = json.load(f)
-                self.id2intent = {v: k for k, v in self.intent2id.items()}
-                
-            with open(self.slot_map_path, 'r') as f:
-                self.slot2id = json.load(f)
-                self.id2slot = {v: k for k, v in self.slot2id.items()}
+        with open(self.intent_map_path, 'r') as f:
+            self.intent2id = json.load(f)
+            self.id2intent = {v: k for k, v in self.intent2id.items()}
+            
+        with open(self.slot_map_path, 'r') as f:
+            self.slot2id = json.load(f)
+            self.id2slot = {v: k for k, v in self.slot2id.items()}
 
-            self.model = JointIntentSlotModel(len(self.intent2id), len(self.slot2id))
-            self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
-            self.model.to(self.device)
-            self.model.eval()
-            print("Successfully loaded Joint Intent & Slot BERT model.")
-            return True
-        except Exception as e:
-            print(f"Error loading model: {e}")
-            return False
+        self.model = JointIntentSlotModel(len(self.intent2id), len(self.slot2id))
+        self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
+        self.model.to(self.device)
+        self.model.eval()
+        print("Successfully loaded Joint Intent & Slot BERT model.")
+        return True
 
     def process(self, transcribed_text):
         """
