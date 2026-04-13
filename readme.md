@@ -45,6 +45,7 @@ Atlas controls a simulated 2D dungeon crawler game.
 Creating a virtual environment is recommended before installing the dependencies.
 ```bash
 pip install -r requirements.txt
+pip install openwakeword onnxruntime
 ```
 
 ### 3. Training the Models
@@ -52,12 +53,15 @@ Before running the assistant, you must train the local neural networks:
 ```
 cd scripts
 
-# Train M1 (Verification) and M2 (Wake Word)
-python train_audio_models.py
+# Train M1 (Verification)
+python train_audio_models.py --m1-only
 
 # Train M4 (BERT Intent Detection)
 python train_intent_model.py
 ```
+
+M2 now uses the `openWakeWord` framework with a custom `Hey Atlas` model.
+Place that custom model at [data/models/openwakeword/README.md](/Users/dorsa/Desktop/uOttawa/Term 4/CSI5180/voice_assistant_project/data/models/openwakeword/README.md).
 
 ## Usage
 Run the main orchestrator to launch the GUI:
@@ -82,7 +86,7 @@ voice_assistant_project/
 ├── core/                       # The 7 modules
 │   ├── __init__.py
 │   ├── m1_verification.py      # MFCC-based binary classifier for team authentication
-│   ├── m2_wake_word.py         # "Hey Atlas" binary classification
+│   ├── m2_wake_word.py         # openWakeWord-backed "Hey Atlas" detection
 │   ├── m3_asr.py               # Whisper integration for speech-to-text
 │   ├── m4_intent.py            # BERT-based intent detection and slot filling
 │   ├── m5_fulfillment.py       # Routes intents to D&D API or Game Engine
@@ -108,7 +112,7 @@ voice_assistant_project/
 │   ├── processed_features/     # Pickled/Numpy arrays of extracted MFCCs
 │   └── models/                 # Saved weights (.pt/.h5) for classifiers and BERT
 ├── scripts/                       
-│   ├── train_audio_models.py   # Train M1 (Verification) and M2 (Wake Word)
+│   ├── train_audio_models.py   # Train M1 (Verification); M2 uses openWakeWord
 │   └── train_intent_model.py   # Train M4 (BERT Intent Detection)
 │
 └── ui/                         # User Interface components

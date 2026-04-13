@@ -9,9 +9,14 @@ class TTSModule:
         # can change this to 'en-CA-ClaraNeural' or others
         self.voice = "en-US-JennyNeural"
         self.output_file = "data/tts_output.mp3"
+        self.audio_enabled = True
         
         # Initialize the pygame mixer for audio playback
-        pygame.mixer.init()
+        try:
+            pygame.mixer.init()
+        except Exception as e:
+            self.audio_enabled = False
+            print(f"TTS audio playback disabled: {e}")
         
         os.makedirs("data", exist_ok=True)
 
@@ -24,14 +29,21 @@ class TTSModule:
             return "No text to speak"
 
         print(f"Generating audio for: '{text}'")
-        
-        # Run the async edge-tts function synchronously
-        asyncio.run(self._generate_audio(text))
-        
-        # Play the generated audio file
-        self._play_audio()
-        
-        return "Audio playback complete"
+
+        if not hasattr(edge_tts, "Communicate"):
+            print("TTS skipped: edge_tts.Communicate is unavailable in this environment.")
+            return "Audio skipped"
+
+        try:
+            # Run the async edge-tts function synchronously
+            asyncio.run(self._generate_audio(text))
+
+            # Play the generated audio file
+            self._play_audio()
+            return "Audio playback complete"
+        except Exception as e:
+            print(f"TTS generation failed: {e}")
+            return "Audio skipped"
         
     async def _generate_audio(self, text):
         """Internal async method to call the Microsoft Edge TTS API."""
@@ -40,6 +52,10 @@ class TTSModule:
         
     def _play_audio(self):
         """Plays the mp3 file and waits for it to finish."""
+        if not self.audio_enabled:
+            print("Audio playback skipped: mixer is unavailable.")
+            return
+
         try:
             pygame.mixer.music.load(self.output_file)
             pygame.mixer.music.play()

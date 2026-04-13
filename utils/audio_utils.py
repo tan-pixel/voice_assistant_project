@@ -44,16 +44,36 @@ def record_audio(file_path="data/live_input.wav", duration=3.0, sr=16000):
     """Records live audio from the microphone and saves it to a file."""
     print(f"Listening for {duration} seconds...")
 
-    # Set the default input device
-    # Change this index if you have multiple audio input devices and want to specify which one to use (check using print(sd.query_devices()))
-    # 2 works for my system
-    sd.default.device[0] = 2
-    
-    # Record audio
-    audio_data = sd.rec(int(duration * sr), samplerate=sr, channels=1, dtype='float32')
-    sd.wait()  # Wait until recording is finished
-    print("Recording complete.")
-    
-    # Save as WAV file
-    sf.write(file_path, audio_data, sr)
-    return file_path
+    try:
+        # Try to use the default input device
+        audio_data = sd.rec(int(duration * sr), samplerate=sr, channels=1, dtype='float32')
+        sd.wait()  # Wait until recording is finished
+        print("Recording complete.")
+        
+        # Save as WAV file
+        sf.write(file_path, audio_data, sr)
+        return file_path
+    except Exception as e:
+        print(f"Error with default device: {e}")
+        
+        # Fallback: List available devices and try first input device
+        print("Available devices:")
+        devices = sd.query_devices()
+        input_device = None
+        
+        for i, device in enumerate(devices):
+            print(f"  {i}: {device}")
+            if device['max_input_channels'] > 0 and input_device is None:
+                input_device = i
+        
+        if input_device is None:
+            raise RuntimeError("No input devices found. Please check your microphone.")
+        
+        print(f"Using input device: {input_device}")
+        audio_data = sd.rec(int(duration * sr), samplerate=sr, channels=1, dtype='float32', device=input_device)
+        sd.wait()
+        print("Recording complete.")
+        
+        # Save as WAV file
+        sf.write(file_path, audio_data, sr)
+        return file_path
