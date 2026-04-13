@@ -125,10 +125,10 @@ class PipelineOrchestrator:
             nl_response = self.m6.process(fulfillment_result)
             self.log(f"Response: {nl_response}")
 
-            # Update the UI Dashboard if it's an API call
-            if source in ["weather_api", "timer", "dnd_api"]:
+            # Update the UI Dashboard for various sources
+            if source in ["weather_api", "timer", "dnd_api", "alarm", "system"]:
                 if self.dashboard_callback:
-                    self.dashboard_callback(source, nl_response)
+                    self.dashboard_callback(source, nl_response, fulfillment_result)
 
             elif source == "game_engine":
                 if self.game_update_callback:

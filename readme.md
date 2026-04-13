@@ -46,6 +46,7 @@ Atlas controls a simulated 2D dungeon crawler game.
 Creating a virtual environment is recommended before installing the dependencies.
 ```bash
 pip install -r requirements.txt
+pip install openwakeword onnxruntime
 ```
 
 ### 3. Training the Models
@@ -59,6 +60,9 @@ python train_wakeword_rf.py
 
 python train_intent_model.py
 ```
+
+M2 now uses the `openWakeWord` framework with a custom `Hey Atlas` model.
+Place that custom model at [data/models/openwakeword/README.md](/Users/dorsa/Desktop/uOttawa/Term 4/CSI5180/voice_assistant_project/data/models/openwakeword/README.md).
 
 ## Usage
 
@@ -90,7 +94,7 @@ voice_assistant_project/
 ├── core/                       # The 7 modules
 │   ├── __init__.py
 │   ├── m1_verification.py      # MFCC-based binary classifier for team authentication
-│   ├── m2_wake_word.py         # "Hey Atlas" binary classification
+│   ├── m2_wake_word.py         # openWakeWord-backed "Hey Atlas" detection
 │   ├── m3_asr.py               # Whisper integration for speech-to-text
 │   ├── m4_intent.py            # BERT-based intent detection and slot filling
 │   ├── m5_fulfillment.py       # Routes intents to D&D API or Game Engine

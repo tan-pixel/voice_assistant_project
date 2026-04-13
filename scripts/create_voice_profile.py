@@ -1,12 +1,30 @@
 import os
 import torch
 import numpy as np
+import functools
 from pydub import AudioSegment
 from speechbrain.inference.speaker import EncoderClassifier
 
+# patch for PyTorch 2.x compatibility
+if not hasattr(torch.amp, 'custom_fwd'):
+    def custom_fwd_noop(func, device_type=None, cast_inputs=None):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+    torch.amp.custom_fwd = custom_fwd_noop
+
+if not hasattr(torch.amp, 'custom_bwd'):
+    def custom_bwd_noop(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+    torch.amp.custom_bwd = custom_bwd_noop
+
 # Configurations
 DATA_DIR = "../data/raw_audio/positive"
-PROFILE_SAVE_PATH = "../data/models/team_voice_profiles.npz" # Note the .npz extension!
+PROFILE_SAVE_PATH = "../data/models/team_voice_profiles.npz"
 TEAM_NAMES = ["nandal", "kubde", "khodabakhsh"]
 
 print("Downloading/Loading Pre-Trained SpeechBrain Model...")
