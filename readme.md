@@ -10,18 +10,18 @@ Developed for **CSI5180: Topics in AI Virtual Assistants** (Winter 2026).
 
 ## Project Overview
 
-Atlas is an end-to-end, state-of-the-art voice assistant featuring a unified pipeline with GPU acceleration support. It integrates user authentication, natural language understanding, and a stateful control system.
+Atlas is an end-to-end, state-of-the-art voice assistant featuring a unified pipeline with GPU acceleration support. It integrates advanced biometric authentication, natural language understanding, and a stateful control system.
 
 ### Core Pipeline Modules
 
 | Module | Description |
 |--------|-------------|
-| **User Verification** | Text-independent binary classifier using MFCC features to authenticate team members. |
-| **Wake Word Detection** | Real-time signature detection for the phrase "Hey Atlas". |
+| **User Verification** | Speaker recognition utilizing pre-trained SpeechBrain (ECAPA-TDNN) embeddings and Cosine Similarity. |
+| **Wake Word Detection** | Transfer learning approach extracting deep acoustic features via HuggingFace's Wav2Vec2-base, classified by a Scikit-Learn Random Forest model. |
 | **Automatic Speech Recognition (ASR)** | Powered by OpenAI Whisper. |
 | **Intent Detection** | Joint Intent Classification and Slot Filling using a fine-tuned DistilBERT model. |
 | **Fulfillment** | Orchestrates requests between the D&D 5e API, Open-Meteo Weather API, and an internal Game Engine. |
-| **Answer Generation** | Transforms JSON data into natural language and updates the visual UI. |
+| **Answer Generation** | Transforms clean API data into natural language via Ollama (`qwen2.5:1.5b-instruct`) and updates the visual UI. |
 | **Text-to-Speech (TTS)** | High-fidelity voice output via Edge-TTS. |
 
 ## Control System: Dungeon Crawler
@@ -37,8 +37,9 @@ Atlas controls a simulated 2D dungeon crawler game.
 ### 1. Prerequisites
 
 - Python 3.10+
-- FFmpeg (required for Whisper audio processing)
-- NVIDIA GPU with CUDA support (strongly recommended for training and inference)
+- **FFmpeg**: Required for audio processing (`pydub`/`whisper`). 
+  - *Windows users:* Install via terminal using `winget install ffmpeg` and completely restart your terminal.
+- NVIDIA GPU with CUDA support (strongly recommended for Wav2Vec2, Whisper, and BERT).
 
 ### 2. Install Dependencies
 
@@ -52,10 +53,10 @@ Before running the assistant, you must train the local neural networks:
 ```
 cd scripts
 
-# Train M1 (Verification) and M2 (Wake Word)
-python train_audio_models.py
+python create_voice_profile.py
 
-# Train M4 (BERT Intent Detection)
+python train_wakeword_rf.py
+
 python train_intent_model.py
 ```
 
@@ -114,7 +115,9 @@ voice_assistant_project/
 │   ├── raw_audio/              # Activity 1 dataset (team vs others)
 │   ├── processed_features/     # Pickled/Numpy arrays of extracted MFCCs
 │   └── models/                 # Saved weights (.pt/.h5) for classifiers and BERT
-├── scripts/                       
+├── scripts/   
+│   ├── create_voice_profile.py # Extracts team embeddings for M1
+│   ├── train_wakeword_rf.py    # Trains Scikit-Learn Wake Word model for M2                    
 │   ├── train_audio_models.py   # Train M1 (Verification) and M2 (Wake Word)
 │   └── train_intent_model.py   # Train M4 (BERT Intent Detection)
 │
