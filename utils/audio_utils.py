@@ -9,7 +9,11 @@ def extract_mfcc_for_inference(file_path, sr=16000, duration=2.0, n_mfcc=40, win
     Updated to match the N_MFCC=40, HOP_SEC=0.010, and standardization logic from training.
     """
     # Load audio
-    y, _ = librosa.load(file_path, sr=sr, mono=True)
+    y, sr = sf.read(file_path)
+
+    # Convert to mono if stereo
+    if len(y.shape) > 1:
+        y = np.mean(y, axis=1)
 
     # Calculate target samples
     num_samples = int(sr * duration)

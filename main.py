@@ -1,15 +1,30 @@
+import sys
+import types
+import traceback 
+
+# Force torchvision and transformers to initialize
+import torchvision
+import transformers
+
+# Force librosa to resolve its lazy-loading before speechbrain is imported
+import librosa
+import numpy as np
+# We process 1 second of pure silence to trigger all of librosa's internal imports
+_ = librosa.feature.mfcc(y=np.zeros(16000), sr=16000)
+
+from core.m4_intent import IntentDetectionModule
+from core.m3_asr import ASRModule
+
+from core.m1_verification import UserVerificationModule
+from core.m2_wake_word import WakeWordDetectionModule
+from core.m5_fulfillment import FulfillmentModule
+from core.m6_generation import AnswerGenerationModule
+from core.m7_tts import TTSModule
+
 import tkinter as tk
 import threading
 from ui.app_window import VoiceAssistantUI
 from utils.audio_utils import record_audio
-
-from core.m1_verification import UserVerificationModule
-from core.m2_wake_word import WakeWordDetectionModule
-from core.m3_asr import ASRModule
-from core.m4_intent import IntentDetectionModule
-from core.m5_fulfillment import FulfillmentModule
-from core.m6_generation import AnswerGenerationModule
-from core.m7_tts import TTSModule
 
 class PipelineOrchestrator:
     def __init__(self):
@@ -22,10 +37,15 @@ class PipelineOrchestrator:
         
         # Initialize modules
         print("Initializing Core Modules...")
+        # Load Transformers/Vision heavy models 
+        self.m4 = IntentDetectionModule()
+        self.m3 = ASRModule()
+        
+        # Load SpeechBrain/Audio models 
         self.m1 = UserVerificationModule()
         self.m2 = WakeWordDetectionModule()
-        self.m3 = ASRModule()
-        self.m4 = IntentDetectionModule()
+        
+        # Load the rest
         self.m5 = FulfillmentModule()
         self.m6 = AnswerGenerationModule()
         self.m7 = TTSModule()
@@ -126,6 +146,7 @@ class PipelineOrchestrator:
             self.log("*** Pipeline Complete ***\n")
         
         except Exception as e:
+            traceback.print_exc()
             self.log(f"An error occurred while running the pipeline: {e}")
         finally:
             self.is_running = False # Unlock the pipeline for the next run
