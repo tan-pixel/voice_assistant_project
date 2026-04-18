@@ -1,5 +1,6 @@
+import os
 import random
-import ollama
+import google.generativeai as genai
 
 class AnswerGenerationModule: 
     
@@ -9,50 +10,37 @@ class AnswerGenerationModule:
         "Try things like what is the weather in Ottawa, set a tea timer for 5 minutes, set a work alarm for 7 AM tomorrow, tell me about a goblin, or move north.",
     ]
     WEATHER_CODE_DESCRIPTIONS = {
-        0: "clear skies",
-        1: "mostly clear skies",
-        2: "partly cloudy skies",
-        3: "overcast skies",
-        45: "foggy conditions",
-        48: "depositing rime fog",
-        51: "light drizzle",
-        53: "moderate drizzle",
-        55: "dense drizzle",
-        56: "light freezing drizzle",
-        57: "dense freezing drizzle",
-        61: "light rain",
-        63: "moderate rain",
-        65: "heavy rain",
-        66: "light freezing rain",
-        67: "heavy freezing rain",
-        71: "light snowfall",
-        73: "moderate snowfall",
-        75: "heavy snowfall",
-        77: "snow grains",
-        80: "light rain showers",
-        81: "moderate rain showers",
-        82: "violent rain showers",
-        85: "light snow showers",
-        86: "heavy snow showers",
-        95: "a thunderstorm",
-        96: "a thunderstorm with light hail",
+        0: "clear skies", 1: "mostly clear skies", 2: "partly cloudy skies",
+        3: "overcast skies", 45: "foggy conditions", 48: "depositing rime fog",
+        51: "light drizzle", 53: "moderate drizzle", 55: "dense drizzle",
+        56: "light freezing drizzle", 57: "dense freezing drizzle", 61: "light rain",
+        63: "moderate rain", 65: "heavy rain", 66: "light freezing rain",
+        67: "heavy freezing rain", 71: "light snowfall", 73: "moderate snowfall",
+        75: "heavy snowfall", 77: "snow grains", 80: "light rain showers",
+        81: "moderate rain showers", 82: "violent rain showers", 85: "light snow showers",
+        86: "heavy snow showers", 95: "a thunderstorm", 96: "a thunderstorm with light hail",
         99: "a thunderstorm with heavy hail",
     }
     RAIN_CODES = {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82}
     SNOW_CODES = {71, 73, 75, 77, 85, 86}
 
-    def __init__(self, use_llm=True, ollama_model="qwen2.5:1.5b-instruct"):
+    def __init__(self, use_llm=True):
         self.use_llm = use_llm
-        self.ollama_model = ollama_model
+        self.api_key = os.getenv("GEMINI_API_KEY")
         
         if self.use_llm:
-            print(f"Connecting to Local LLM ({self.ollama_model}) via Ollama package...")
-            try:
-                # Ping the server by trying to list the downloaded models
-                ollama.list()
-            except Exception as e:
-                print(f"Notice: Ollama background server is not running ({e}). Falling back to Template Generation.")
+            if not self.api_key:
+                print("Notice: GEMINI_API_KEY not found in environment variables. Falling back to Template Generation.")
                 self.use_llm = False
+            else:
+                print("Connecting to Gemini API (gemini-2.5-flash)...")
+                try:
+                    genai.configure(api_key=self.api_key)
+                    # We use flash because it is optimized for lightning-fast voice assistant responses
+                    self.model = genai.GenerativeModel('gemini-2.5-flash')
+                except Exception as e:
+                    print(f"Notice: Failed to connect to Gemini API ({e}). Falling back to Template Generation.")
+                    self.use_llm = False
 
     def process(self, fulfillment_data):
         """
@@ -76,62 +64,64 @@ class AnswerGenerationModule:
             print(f"Backend API Error: {data['error']}")
             return "I ran into a network issue and couldn't fetch that information right now."
 
-        # Ollama LLM route
+        # Gemini API route
         if self.use_llm:
-            return self._generate_with_ollama(source, intent, data)
+            return self._generate_with_gemini(source, intent, data)
         
         # Template route
         else:
             return self._generate_with_templates(source, intent, data)
 
-    def _generate_with_ollama(self, source, intent, data):
-        """Creates a prompt from the JSON and asks Ollama to generate the response."""
+    def _generate_with_gemini(self, source, intent, data):
+        """Creates a prompt from the JSON and asks Gemini to generate the response."""
         
-        # Few-Shot Prompting
-        system_prompt = """You are Atlas, a conversational voice assistant. 
-        Your ONLY job is to convert the provided Intent and JSON Data into a single, natural, spoken English sentence.
+        # Few-Shot Prompting combined with System Instructions
+        prompt = f"""You are Atlas, a conversational voice assistant. 
+Your ONLY job is to convert the provided Intent and JSON Data into a single, natural, spoken English sentence.
 
-        CRITICAL RULES:
-        1. NEVER explain the JSON structure or say "This is a dictionary/JSON".
-        2. NEVER use markdown, asterisks, or bullet points.
-        3. Output EXACTLY ONE conversational sentence. Stop talking immediately after.
+CRITICAL RULES:
+1. NEVER explain the JSON structure or say "This is a dictionary/JSON".
+2. NEVER use markdown, asterisks, or bullet points.
+3. Output EXACTLY ONE conversational sentence. Stop talking immediately after.
 
-        EXAMPLE 1:
-        Intent: Weather
-        Data: {'city': 'Paris', 'current': {'temperature_2m': 15, 'weather_code': 3}}
-        Output: The current temperature in Paris is 15 degrees.
+EXAMPLE 1:
+Intent: Weather
+Data: {{'city': 'Paris', 'current': {{'temperature_2m': 15, 'weather_code': 3}}}}
+Output: The current temperature in Paris is 15 degrees.
 
-        EXAMPLE 2:
-        Intent: lookup_monster
-        Data: {'name': 'Ancient Red Dragon', 'armor_class': 22, 'hit_points': 546}
-        Output: An Ancient Red Dragon is a terrifying foe with an armor class of 22 and 546 hit points.
-        """
+EXAMPLE 2:
+Intent: lookup_monster
+Data: {{'name': 'Ancient Red Dragon', 'armor_class': 22, 'hit_points': 546}}
+Output: An Ancient Red Dragon is a terrifying foe with an armor class of 22 and 546 hit points.
 
-        # User Prompt
-        user_prompt = f"Intent: {intent}\nData: {data}\nOutput:"
+Now, process the following:
+Intent: {intent}
+Data: {data}
+Output:"""
         
         try:
-            # We pass the system instructions separately from the user prompt for better obedience
-            response = ollama.generate(
-                model=self.ollama_model, 
-                system=system_prompt,
-                prompt=user_prompt
-            )
+            # --- THE DEBUG LOGS: SEEING WHAT THE AI SEES ---
+            print("\n" + "="*40)
+            print("SENDING TO GEMINI API:")
+            print(prompt)
+            print("="*40 + "\n")
+
+            response = self.model.generate_content(prompt)
+            result_text = response.text
             
-            # Extract the text 
-            result_text = response.get("response", "")
-            
+            print("\n" + "="*40)
+            print("🌠 RECEIVED FROM GEMINI API:")
+            print(result_text)
+            print("="*40 + "\n")
+            # -----------------------------------------------
+
             # Clean up the response to ensure TTS reads it nicely
             clean_text = result_text.strip().replace("*", "").replace("\n", " ")
-            
-            # # If the model still babbles, cut it off at the first period.
-            # if "." in clean_text:
-            #     clean_text = clean_text.split(".")[0] + "."
                 
             return clean_text
             
         except Exception as e:
-            print(f"Ollama Generation Failed: {e}. Falling back to templates.")
+            print(f"Gemini Generation Failed: {e}. Falling back to templates.")
             return self._generate_with_templates(source, intent, data)
         
     def _generate_with_templates(self, source, intent, data):

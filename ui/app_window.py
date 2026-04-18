@@ -1,115 +1,199 @@
+"""
+voice_assistant_ui.py  –  Atlas Voice Assistant (Group 15)
+
+Dark mode UI with green accents. Map stays light.
+Requires:  pip install ttkbootstrap
+"""
+
+import threading
 import tkinter as tk
-from tkinter import ttk
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+
 from ui.pipeline_view import PipelineView
 from ui.game_view import GameView
-import threading
+
+
+# ── dark palette with green accents ──────────────────────────────────────────
+BG_ROOT   = "#141a16"   # near-black with a green undertone
+BG_CARD   = "#1e2822"   # dark green-tinted card surface
+BG_PANEL  = "#263020"   # slightly lighter panel interior
+BORDER    = "#3a5040"   # muted green border
+ACCENT    = "#3dba72"   # bright sage green for headings / icons
+FG_HEAD   = "#e8f5ed"   # off-white heading text
+FG_BODY   = "#b8d4c0"   # soft green-grey body text
+FG_DIM    = "#5a7a62"   # muted for placeholders / step labels
+
+FONT_H2   = ("Segoe UI", 10, "bold")
+FONT_BODY = ("Segoe UI", 9)
+
 
 class VoiceAssistantUI:
     def __init__(self, root, orchestrator):
         self.root = root
         self.orchestrator = orchestrator
-        self.root.title("Atlas Voice Assistant - Group 15")
-        self.root.geometry("1000x600")
-        
-        # Configure grid for the main window (2 columns)
-        self.root.columnconfigure(0, weight=1) # Pipeline gets 1 part width
-        self.root.columnconfigure(1, weight=2) # Game view gets 2 parts width
+
+        self.root.title("🎙️  Atlas Voice Assistant  ·  Group 15")
+        self.root.geometry("1140x680")
+        self.root.minsize(900, 540)
+        self.root.configure(bg=BG_ROOT)
+
+        # "darkly" is ttkbootstrap's clean dark base; we layer our green palette on top
+        self._style = ttk.Style(theme="darkly")
+        self._patch_styles()
+
+        self.root.columnconfigure(0, weight=1)
+        self.root.columnconfigure(1, weight=2)
         self.root.rowconfigure(0, weight=1)
 
-        # Build Left Panel: Pipeline & Bypasses
-        self.pipeline_frame = tk.Frame(self.root, bg="#f0f0f0", bd=2, relief="groove")
-        self.pipeline_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        self.pipeline_view = PipelineView(self.pipeline_frame, self.orchestrator, self.update_game_log)
+        # ── LEFT PANEL ────────────────────────────────────────────────────────
+        left = self._card(self.root, col=0, padx=(12, 6))
 
-        self.build_bypass_panel(self.pipeline_frame)
+        self._heading(left, "⚡  Pipeline")
+        self._rule(left)
+        self.pipeline_view = PipelineView(left, self.orchestrator, self.update_game_log)
 
-        # Build Right Panel: Dungeon Crawler System
-        self.game_frame = tk.Frame(self.root, bd=2, relief="groove")
-        self.game_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
-        self.game_view = GameView(self.game_frame)
+        self._heading(left, "🔧  Bypasses", pady=(18, 4))
+        self._rule(left)
+        self._build_bypass_panel(left)
 
-    def build_bypass_panel(self, parent_frame):
-        """Builds the left panel with inputs to satisfy the project bypass requirements."""
-        tk.Label(parent_frame, text="Pipeline Bypasses", font=("Arial", 12, "bold")).pack(pady=10)
+        # ── RIGHT PANEL ───────────────────────────────────────────────────────
+        right = self._card(self.root, col=1, padx=(6, 12))
 
-        # Step 1: User Verification (Passcode)
-        tk.Label(parent_frame, text="1. Verification (Code):").pack(anchor="w", padx=5)
-        f1 = tk.Frame(parent_frame)
-        f1.pack(fill="x", padx=5, pady=2)
-        self.code_input = tk.Entry(f1, width=15)
-        self.code_input.pack(side="left", padx=2)
-        tk.Button(f1, text="Unlock", command=lambda: self.trigger_bypass(1, self.code_input.get())).pack(side="right")
+        self._heading(right, "🎮  Dungeon Crawler")
+        self._rule(right)
 
-        # Step 2: Wake Word (Text Input)
-        tk.Label(parent_frame, text="2. Wake Word (Type):").pack(anchor="w", padx=5, pady=(10,0))
-        f2 = tk.Frame(parent_frame)
-        f2.pack(fill="x", padx=5, pady=2)
-        self.wake_input = tk.Entry(f2, width=15)
-        self.wake_input.pack(side="left", padx=2)
-        tk.Button(f2, text="Wake", command=lambda: self.trigger_bypass(2, self.wake_input.get())).pack(side="right")
+        game_container = tk.Frame(right, bg=BG_CARD)
+        game_container.pack(fill="both", expand=True, padx=4, pady=(0, 6))
 
-        # Step 3: ASR (Text Injection)
-        tk.Label(parent_frame, text="3. ASR (Type command):").pack(anchor="w", padx=5, pady=(10,0))
-        f3 = tk.Frame(parent_frame)
-        f3.pack(fill="x", padx=5, pady=2)
-        self.asr_input = tk.Entry(f3, width=15)
-        self.asr_input.pack(side="left", padx=2)
-        tk.Button(f3, text="Send", command=lambda: self.trigger_bypass(3, self.asr_input.get())).pack(side="right")
+        self.game_view = GameView(game_container)
+        self.game_view.update_game_visuals(self.orchestrator.m5.game_engine.state)
 
-        # Step 4: Intent/Slots (Dropdown + Text)
-        tk.Label(parent_frame, text="4. Intent & Slots:").pack(anchor="w", padx=5, pady=(10,0))
-        self.intent_combo = ttk.Combobox(parent_frame, values=["Weather", "Timer", "move", "lookup_monster", "Greetings"], state="readonly")
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _patch_styles(self):
+        s = self._style
+        s.configure("TFrame",    background=BG_CARD)
+        s.configure("TLabel",    background=BG_CARD, foreground=FG_BODY, font=FONT_BODY)
+        s.configure("TEntry",    padding=(6, 4),     font=FONT_BODY,
+                                 fieldbackground=BG_PANEL, foreground=FG_BODY)
+        s.configure("TButton",   font=FONT_BODY,     padding=(8, 4))
+        s.configure("TCombobox", font=FONT_BODY,     padding=(4, 4),
+                                 fieldbackground=BG_PANEL, foreground=FG_BODY)
+
+    def _card(self, parent, col, padx=(12, 12)):
+        f = tk.Frame(parent, bg=BG_CARD)
+        f.grid(row=0, column=col, sticky="nsew", padx=padx, pady=12)
+        f.columnconfigure(0, weight=1)
+        return f
+
+    def _heading(self, parent, text, pady=(10, 2)):
+        tk.Label(parent, text=text, font=FONT_H2,
+                 fg=ACCENT, bg=BG_CARD, anchor="w"
+                 ).pack(fill="x", padx=14, pady=pady)
+
+    def _rule(self, parent):
+        tk.Frame(parent, bg=BORDER, height=1).pack(fill="x", padx=12, pady=(0, 8))
+
+    def _step_label(self, parent, text):
+        tk.Label(parent, text=text, font=FONT_BODY,
+                 fg=FG_DIM, bg=BG_CARD, anchor="w"
+                 ).pack(fill="x", padx=14, pady=(9, 2))
+
+    def _row(self, parent):
+        f = tk.Frame(parent, bg=BG_CARD)
+        f.pack(fill="x", padx=12, pady=3)
+        return f
+
+    def _entry_btn(self, parent, placeholder, btn_text, btn_style, cmd):
+        row = self._row(parent)
+        e = ttk.Entry(row, font=FONT_BODY, width=16)
+        e.insert(0, placeholder)
+        e.configure(foreground=FG_DIM)
+
+        def fi(_):
+            if e.get() == placeholder:
+                e.delete(0, "end"); e.configure(foreground=FG_HEAD)
+        def fo(_):
+            if not e.get():
+                e.insert(0, placeholder); e.configure(foreground=FG_DIM)
+
+        e.bind("<FocusIn>", fi); e.bind("<FocusOut>", fo)
+        e.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ttk.Button(row, text=btn_text, bootstyle=btn_style,
+                   width=9, command=cmd).pack(side="right")
+        return e
+
+    # ── bypass panel ──────────────────────────────────────────────────────────
+
+    def _build_bypass_panel(self, parent):
+        self._step_label(parent, "① Verification")
+        self.code_input = self._entry_btn(
+            parent, "passcode", "Unlock 🔑", "warning-outline",
+            lambda: self.trigger_bypass(1, self._val(self.code_input, "passcode")))
+
+        self._step_label(parent, "② Wake Word")
+        self.wake_input = self._entry_btn(
+            parent, "e.g. 'Hey Atlas'", "Wake 🔔", "info-outline",
+            lambda: self.trigger_bypass(2, self._val(self.wake_input, "e.g. 'Hey Atlas'")))
+
+        self._step_label(parent, "③ ASR  (type command)")
+        self.asr_input = self._entry_btn(
+            parent, "e.g. 'go north'", "Send 🎤", "success-outline",
+            lambda: self.trigger_bypass(3, self._val(self.asr_input, "e.g. 'go north'")))
+
+        self._step_label(parent, "④ Intent & Slots")
+        self.intent_combo = ttk.Combobox(
+            parent,
+            values=["Weather", "Timer", "move", "lookup_monster", "Greetings"],
+            state="readonly", font=FONT_BODY,
+        )
         self.intent_combo.set("Weather")
-        self.intent_combo.pack(fill="x", padx=5, pady=2)
+        self.intent_combo.pack(fill="x", padx=12, pady=(2, 4))
         self.intent_combo.bind("<<ComboboxSelected>>", self._on_intent_changed)
-        f4 = tk.Frame(parent_frame)
-        f4.pack(fill="x", padx=5, pady=2)
-        self.slot_input = tk.Entry(f4, width=15)
-        self.slot_input.insert(0, "city: Paris") # Placeholder example
-        self.slot_input.pack(side="left", padx=2)
-        tk.Button(f4, text="Inject", command=self._inject_intent_bypass).pack(side="right")
 
-        # Step 5 & 6: Pre-Canned Buttons
-        tk.Label(parent_frame, text="5 & 6. Pre-Canned:").pack(anchor="w", padx=5, pady=(15,0))
-        tk.Button(parent_frame, text="Bypass 5: Canned API", command=lambda: self.trigger_bypass(5, None)).pack(fill="x", padx=5, pady=2)
-        tk.Button(parent_frame, text="Bypass 6: Canned NL", command=lambda: self.trigger_bypass(6, None)).pack(fill="x", padx=5, pady=2)
+        row4 = self._row(parent)
+        self.slot_input = ttk.Entry(row4, font=FONT_BODY, width=16)
+        self.slot_input.insert(0, "city: Paris")
+        self.slot_input.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ttk.Button(row4, text="Inject 💉", bootstyle="success-outline",
+                   width=9, command=self._inject_intent_bypass).pack(side="right")
 
-    def _on_intent_changed(self, event):
-        """Automatically fills the slot input with a default template when the dropdown changes."""
-        selected_intent = self.intent_combo.get()
-        
-        # Clear whatever is currently in the text box
-        self.slot_input.delete(0, tk.END)
-        
-        # Insert the correct pre-written template
-        if selected_intent == "Weather":
-            self.slot_input.insert(0, "city: Paris")
-        elif selected_intent == "Timer":
-            self.slot_input.insert(0, "duration: 5 minutes")
-        elif selected_intent == "move":
-            self.slot_input.insert(0, "direction: north")
-        elif selected_intent == "lookup_monster":
-            self.slot_input.insert(0, "name: badger")
-        elif selected_intent == "Greetings":
-            self.slot_input.insert(0, "") # Greetings don't require slots
+        self._step_label(parent, "⑤ ⑥ Pre-canned")
+        row56 = self._row(parent)
+        ttk.Button(row56, text="⑤  Canned API", bootstyle="secondary-outline",
+                   command=lambda: self.trigger_bypass(5, None)
+                   ).pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ttk.Button(row56, text="⑥  Canned NL", bootstyle="secondary-outline",
+                   command=lambda: self.trigger_bypass(6, None)
+                   ).pack(side="right", fill="x", expand=True)
+
+    # ── events ────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _val(entry, placeholder):
+        v = entry.get()
+        return "" if v == placeholder else v
+
+    def _on_intent_changed(self, _):
+        self.slot_input.delete(0, "end")
+        self.slot_input.insert(0, {
+            "Weather": "city: Paris", "Timer": "duration: 5 minutes",
+            "move": "direction: north", "lookup_monster": "monster_name: badger",
+            "Greetings": "",
+        }.get(self.intent_combo.get(), ""))
 
     def _inject_intent_bypass(self):
-        """Helper to package the intent and slots into a dictionary before sending."""
-        intent = self.intent_combo.get()
-        slot_text = self.slot_input.get()
-        # Simple parser: "city: Paris" -> {"city": "Paris"}
+        intent, slot_text = self.intent_combo.get(), self.slot_input.get()
         slots = {}
         if ":" in slot_text:
             k, v = slot_text.split(":", 1)
             slots[k.strip()] = v.strip()
-            
-        data = {"intent": intent, "slots": slots}
-        self.trigger_bypass(4, data)
+        self.trigger_bypass(4, {"intent": intent, "slots": slots})
 
     def trigger_bypass(self, step, data):
-        """Runs the bypass in a background thread to prevent UI freezing."""
-        threading.Thread(target=self.orchestrator.manual_override, args=(step, data), daemon=True).start()
+        threading.Thread(target=self.orchestrator.manual_override,
+                         args=(step, data), daemon=True).start()
 
     def update_game_log(self, text):
-        """Allows the pipeline to send messages to the game UI log."""
         self.game_view.update_log(text)

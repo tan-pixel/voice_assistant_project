@@ -20,7 +20,7 @@ class TTSModule:
         
         try:
             self.pipeline = KPipeline(lang_code='a', device=self.device)
-            self.kokoro_voice = 'af_heart' 
+            self.kokoro_voice = 'am_santa' 
         except Exception as e:
             print(f"Warning: Kokoro failed to initialize ({e}). Defaulting to Cloud TTS.")
             self.use_local = False

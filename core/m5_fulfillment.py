@@ -56,7 +56,7 @@ class FulfillmentModule:
             return {"error": "Invalid intent data provided to Fulfillment module."}
 
         intent = intent_data["intent"]
-        slots = intent_data.get("slots", {})
+        slots = self._normalize_slots(intent_data.get("slots", {}))
         raw_text = intent_data.get("raw_text", "")
 
         # Route to Weather API
@@ -210,6 +210,56 @@ class FulfillmentModule:
             return True, now + timedelta(days=delta)
 
         return False, now
+    
+    def _normalize_slots(self, slots):
+        """Maps raw spoken words extracted by BERT to Canonical Database/Game IDs."""
+        normalized = {}
+        for key, value in slots.items():
+            # Clean up the raw string
+            val_lower = str(value).lower().strip()
+
+            # Game Movement (Handle ASR typos)
+            if key == "direction":
+                aliases = {"rate": "right", "write": "right", "wright": "right", "lift": "left"}
+                normalized[key] = aliases.get(val_lower, val_lower)
+            
+            # Game Items
+            elif key == "item_name":
+                aliases = {
+                    "health potion": "Health Potion", "potion": "Health Potion", "health": "Health Potion",
+                    "rusty key": "Rusty Key", "key": "Rusty Key",
+                    "battle axe": "Battle Axe", "axe": "Battle Axe", "weapon": "Battle Axe",
+                    "iron sword": "Iron Sword", "sword": "Iron Sword"
+                }
+                normalized[key] = aliases.get(val_lower, value.title())
+
+            # Game Objects (Chests/Doors)
+            elif key == "object_name":
+                aliases = {
+                    "treasure chest": "Treasure Chest", "locked chest": "Treasure Chest", 
+                    "chest": "Treasure Chest", "box": "Treasure Chest", "treasure": "Treasure Chest"
+                }
+                normalized[key] = aliases.get(val_lower, value.title())
+            
+            # Game Enemies
+            elif key == "monster_name":
+                aliases = {"goblin": "Goblin", "monster": "Goblin", "enemy": "Goblin", "creature": "Goblin"}
+                # If it's a D&D lookup, we want to format it for the web API instead of the game engine
+                if "lookup" not in key: 
+                    normalized[key] = aliases.get(val_lower, value.title())
+                else:
+                    normalized[key] = val_lower.replace(" ", "-").replace("'", "")
+            
+            # D&D 5e API Formatting
+            # The D&D web API requires dashes instead of spaces (e.g. "ancient red dragon" -> "ancient-red-dragon")
+            elif key in ["weapon_name", "spell_name", "class_name", "race_name", "armor_name", "condition_name", "category"]:
+                normalized[key] = val_lower.replace(" ", "-").replace("'", "")
+            
+            # Default fallback
+            else:
+                normalized[key] = value
+
+        return normalized
 
     def _parse_alarm_time(self, time_text, raw_text):
         search_text = f"{(time_text or '').lower()} {raw_text}".strip()
