@@ -10,7 +10,7 @@ Developed for **CSI5180: Topics in AI Virtual Assistants** (Winter 2026).
 
 ## Project Overview
 
-Atlas is an end-to-end, state-of-the-art voice assistant featuring a unified pipeline with GPU acceleration support. It integrates advanced biometric authentication, natural language understanding, and a stateful control system.
+Atlas is an end-to-end voice assistant featuring a unified pipeline with GPU acceleration support. It integrates advanced biometric authentication, natural language understanding, and a stateful control system.
 
 ### Core Pipeline Modules
 
@@ -60,9 +60,6 @@ python train_wakeword_rf.py
 
 python train_intent_model.py
 ```
-
-M2 now uses the `openWakeWord` framework with a custom `Hey Atlas` model.
-Place that custom model at [data/models/openwakeword/README.md](/Users/dorsa/Desktop/uOttawa/Term 4/CSI5180/voice_assistant_project/data/models/openwakeword/README.md).
 
 ## Usage
 
